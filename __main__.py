@@ -78,23 +78,33 @@ logging.basicConfig(format='%(levelname)s:%(message)s', level='INFO')
 
 Token = tokenHandler()
 
-citationList = []
-bibtexString = ''
 headers = {'Authorization': f'Bearer {Token.token}', 'Content-type': 'application/vnd.mendeley-document-summary+json'}
-response = requests.get('https://api.mendeley.com/folders', timeout=30, headers=headers)
-for folder in response.json():
-    folderID = folder['id']
-    logging.info(f'Parser: Processing folder {folderID}')
+response = requests.get('https://api.mendeley.com/documents?limit=500', timeout=30, headers=headers)
+entries = len(response.json())
+if entries < 500:
+    logging.info(f'Parser: fewer than 500 refs means I can one-shot this list')
     headers = {'Authorization': f'Bearer {Token.token}', 'accept': 'application/x-bibtex'}
-    response = requests.get(f'https://api.mendeley.com/documents?folder_id={folderID}&limit=500', timeout=30, headers=headers)
-    if response.text != '':
-        splittext = response.text.split('\n\n')
-        for entry in splittext:
-            entryID = entry.split('{')[1].split(',')[0]
-            logging.info(f'Parser: Processing entry {entryID}')
-            if entryID not in citationList:
-                citationList += [entryID]
-                bibtexString += f'{entry}\n\n'
+    response = requests.get(f'https://api.mendeley.com/documents?limit=500', timeout=30, headers=headers)
+    bibtexString = response.text
+else:
+    logging.info(f'Parser: 500 or more refs means that I have to go folder-by-folder')
+    citationList = []
+    bibtexString = ''
+    headers = {'Authorization': f'Bearer {Token.token}', 'Content-type': 'application/vnd.mendeley-document-summary+json'}
+    response = requests.get('https://api.mendeley.com/folders', timeout=30, headers=headers)
+    for folder in response.json():
+        folderID = folder['id']
+        logging.info(f'Parser: Processing folder {folderID}')
+        headers = {'Authorization': f'Bearer {Token.token}', 'accept': 'application/x-bibtex'}
+        response = requests.get(f'https://api.mendeley.com/documents?folder_id={folderID}&limit=500', timeout=30, headers=headers)
+        if response.text != '':
+            splittext = response.text.split('\n\n')
+            for entry in splittext:
+                entryID = entry.split('{')[1].split(',')[0]
+                logging.info(f'Parser: Processing entry {entryID}')
+                if entryID not in citationList:
+                    citationList += [entryID]
+                    bibtexString += f'{entry}\n\n'
 
 with open(bibFile, 'w') as f:
     f.write(bibtexString)

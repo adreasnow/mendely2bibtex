@@ -3,6 +3,6 @@ I knocked up this script this afternoon, since I realised that with Mendeley mov
 
 The app is pretty simple, it just creates and manages an OAuth token, refreshes it if needed and pickles the token object between runs (yeah I know it's not the most secure...). From this it just calls the Mendeley API which returns the entires as BibTeX entries.
 
-Since the API is limited ot a maximum of 500 citations, it cycles through each of the folders and makes sures that it's not doubling up on entries, by using the citation key as an index.
+Since the API is limited ot a maximum of 500 citations, if it detects that there's more than 499 refs, it cycles through each of the folders and makes sures that it's not doubling up on entries, by using the citation key as an index. if there's \<= 499 refs, then it can one-shot them down!
 
 See, VERY simple :)
