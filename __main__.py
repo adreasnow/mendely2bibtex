@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 import logging
 import random, string
 
-authFile = 'auth.pickle'
-bibFile = '/Users/adrea/library2.bib'
+authFile = '/Users/adrea/.auth.pickle'
+bibFile = '/Users/adrea/library.bib'
 
 class TokenClass:
     def __init__(self):
@@ -20,7 +20,6 @@ class TokenClass:
         self.state = ''
         if self.token == '':
             self.getNewOAuthToken()
-            self.generateState()
 
     def pickleSelf(self):
         logging.info('Token: saving token to file')
@@ -32,10 +31,13 @@ class TokenClass:
 
     def getNewOAuthToken(self):
         logging.info('Token: grabbing new token')
+        self.generateState()
         authorization_url = f'{self.authorize_url}?response_type=code&client_id={self.client_id}&redirect_uri={requests.utils.quote(self.redirect_uri)}&scope={self.scope}&state={self.state}'
-
         print( f'Please go to {authorization_url} to authorize access, and copy the final localhost URL')
         authorization_response = input("Response: ").split('http://localhost:5000/oauth?code=')
+        if authorization_response[1].split('&state=')[1] != self.state:
+            logging.arror('Token: CSRF detected, aborting')
+            exit()
         headers = {'Content-type': 'application/x-www-form-urlencoded'}
         data = f'grant_type=authorization_code&code={authorization_response[1]}&redirect_uri={self.redirect_uri}'
         token = requests.post(self.token_url, data=data, auth=(self.client_id, self.client_secret), headers=headers)
@@ -43,10 +45,10 @@ class TokenClass:
         self.refresh = token.json()['refresh_token']
         self.expire = datetime.now() + timedelta(seconds=token.json()['expires_in']) 
         self.pickleSelf()
-        self.generateState()
 
     def refreshOAuthToken(self):
         logging.info('Token: refreshing token')
+        self.generateState()
         headers = {'Content-type': 'application/x-www-form-urlencoded'}
         data = f'grant_type=refresh_token&refresh_token={self.refresh}&redirect_uri={self.redirect_uri}'
         token = requests.post(self.token_url, data=data, auth=(self.client_id, self.client_secret), headers=headers)
@@ -54,8 +56,7 @@ class TokenClass:
         self.refresh = token.json()['refresh_token']
         self.expire = datetime.now() + timedelta(seconds=token.json()['expires_in'])
         self.pickleSelf()
-        self.generateState()
-    
+        
     def checkToken(self):
         if self.expire < datetime.now():
             logging.info('Token: token is out of date and being refreshed')
