@@ -1,8 +1,8 @@
 import requests
 import pickle
 from datetime import datetime, timedelta
-from requests_oauthlib import OAuth2Session
 import logging
+import random, string
 
 authFile = 'auth.pickle'
 bibFile = '/Users/adrea/library2.bib'
@@ -17,18 +17,23 @@ class TokenClass:
         self.authorize_url = "https://api.mendeley.com/oauth/authorize"
         self.token_url = "https://api.mendeley.com/oauth/token"
         self.token = ''
+        self.state = ''
         if self.token == '':
             self.getNewOAuthToken()
+            self.generateState()
 
     def pickleSelf(self):
         logging.info('Token: saving token to file')
         with open(authFile, 'wb') as f:
             pickle.dump(self, f)
 
+    def generateState(self):
+        self.state = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+
     def getNewOAuthToken(self):
         logging.info('Token: grabbing new token')
-        oauth = OAuth2Session(self.client_id, redirect_uri=self.redirect_uri, scope=self.scope)
-        authorization_url, self.state = oauth.authorization_url(self.authorize_url)
+        authorization_url = f'{self.authorize_url}?response_type=code&client_id={self.client_id}&redirect_uri={requests.utils.quote(self.redirect_uri)}&scope={self.scope}&state={self.state}'
+
         print( f'Please go to {authorization_url} to authorize access, and copy the final localhost URL')
         authorization_response = input("Response: ").split('http://localhost:5000/oauth?code=')
         headers = {'Content-type': 'application/x-www-form-urlencoded'}
@@ -38,6 +43,7 @@ class TokenClass:
         self.refresh = token.json()['refresh_token']
         self.expire = datetime.now() + timedelta(seconds=token.json()['expires_in']) 
         self.pickleSelf()
+        self.generateState()
 
     def refreshOAuthToken(self):
         logging.info('Token: refreshing token')
@@ -46,8 +52,9 @@ class TokenClass:
         token = requests.post(self.token_url, data=data, auth=(self.client_id, self.client_secret), headers=headers)
         self.token = token.json()['access_token']
         self.refresh = token.json()['refresh_token']
-        self.expire = datetime.now() + timedelta(seconds=token.json()['expires_in']) 
+        self.expire = datetime.now() + timedelta(seconds=token.json()['expires_in'])
         self.pickleSelf()
+        self.generateState()
     
     def checkToken(self):
         if self.expire < datetime.now():
