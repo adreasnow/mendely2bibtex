@@ -4,8 +4,8 @@ I knocked up this script this afternoon, since I realised that with Mendeley mov
 The app is pretty simple, it just creates and manages an OAuth token, refreshes it if needed and pickles the token object between runs (yeah I know it's not the most secure...). From this it just calls the Mendeley API which returns the entires as BibTeX entries.
 
 Since the API is limited ot a maximum of 500 citations, I've implemented a bit of logic that:
-* Check if there's \<= 499 refs and one shots them into a bibtex file
-* If there's \> 499 refs, it will also test the api call on a descending sort and see if there's any overlap betyween the two lists to identify if there's \<= 1000 refs. If there is, it will two shot them into a bibtex file
+* Check if there's \<= 499 refs and will "one-shot" them into a bibtex file
+* If there's \> 499 refs, it will also test the api call on a descending sort and see if there's any overlap betyween the two lists to identify if there's \<= 1000 refs. If there is, it will "two-shot" them into a bibtex file
 * if it detects that there's more than 1000 refs, it cycles through each of the folders and makes sures that it's not doubling up on entries, by using the citation key as an index. and then adds each entry to the bibtex file one by one.
 
 See, VERY simple :)
