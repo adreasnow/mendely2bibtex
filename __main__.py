@@ -1,3 +1,4 @@
+#!python
 import requests
 import pickle
 from datetime import datetime, timedelta
@@ -78,33 +79,49 @@ logging.basicConfig(format='%(levelname)s:%(message)s', level='INFO')
 
 Token = tokenHandler()
 
+# check if more that 500 entries
 headers = {'Authorization': f'Bearer {Token.token}', 'Content-type': 'application/vnd.mendeley-document-summary+json'}
-response = requests.get('https://api.mendeley.com/documents?limit=500', timeout=30, headers=headers)
+response = requests.get('https://api.mendeley.com/documents?limit=500&order=asc&sort=created', timeout=30, headers=headers)
 entries = len(response.json())
 if entries < 500:
     logging.info(f'Parser: fewer than 500 refs means I can one-shot this list')
     headers = {'Authorization': f'Bearer {Token.token}', 'accept': 'application/x-bibtex'}
     response = requests.get(f'https://api.mendeley.com/documents?limit=500', timeout=30, headers=headers)
     bibtexString = response.text
-else:
-    logging.info(f'Parser: 500 or more refs means that I have to go folder-by-folder')
+else: # check if more that 1000 entries
     citationList = []
-    bibtexString = ''
-    headers = {'Authorization': f'Bearer {Token.token}', 'Content-type': 'application/vnd.mendeley-document-summary+json'}
-    response = requests.get('https://api.mendeley.com/folders', timeout=30, headers=headers)
-    for folder in response.json():
-        folderID = folder['id']
-        logging.info(f'Parser: Processing folder {folderID}')
+    for entry in response.json():
+        citationList += [entry[id]]
+    response = requests.get('https://api.mendeley.com/documents?limit=500&order=desc&sort=created', timeout=30, headers=headers)
+    for entry in response.json():
+        if entry[id] in citationList:
+            overlap = True
+    if overlap == True: # if between 500 - 1000 entries
+        logging.info(f'Parser: more than 500, but fewer than 1000 refs means I can two-shot this list')
         headers = {'Authorization': f'Bearer {Token.token}', 'accept': 'application/x-bibtex'}
-        response = requests.get(f'https://api.mendeley.com/documents?folder_id={folderID}&limit=500', timeout=30, headers=headers)
-        if response.text != '':
-            splittext = response.text.split('\n\n')
-            for entry in splittext:
-                entryID = entry.split('{')[1].split(',')[0]
-                logging.info(f'Parser: Processing entry {entryID}')
-                if entryID not in citationList:
-                    citationList += [entryID]
-                    bibtexString += f'{entry}\n\n'
+        response = requests.get(f'https://api.mendeley.com/documents?limit=500&order=asc&sort=created', timeout=30, headers=headers)
+        bibtexString = response.text
+        response = requests.get(f'https://api.mendeley.com/documents?limit=500&order=desc&sort=created', timeout=30, headers=headers)
+        bibtexString  = f'{bibtexString}\n\n{response.text}'
+    else: # if more than 1000 entries
+        logging.info(f'Parser: 1000 or more refs means that I have to go folder-by-folder')
+        citationList = []
+        bibtexString = ''
+        headers = {'Authorization': f'Bearer {Token.token}', 'Content-type': 'application/vnd.mendeley-document-summary+json'}
+        response = requests.get('https://api.mendeley.com/folders', timeout=30, headers=headers)
+        for folder in response.json():
+            folderID = folder['id']
+            logging.info(f'Parser: Processing folder {folderID}')
+            headers = {'Authorization': f'Bearer {Token.token}', 'accept': 'application/x-bibtex'}
+            response = requests.get(f'https://api.mendeley.com/documents?folder_id={folderID}&limit=500', timeout=30, headers=headers)
+            if response.text != '':
+                splittext = response.text.split('\n\n')
+                for entry in splittext:
+                    entryID = entry.split('{')[1].split(',')[0]
+                    logging.info(f'Parser: Processing entry {entryID}')
+                    if entryID not in citationList:
+                        citationList += [entryID]
+                        bibtexString += f'{entry}\n\n'
 
 with open(bibFile, 'w') as f:
     f.write(bibtexString)
